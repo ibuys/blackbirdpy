@@ -46,7 +46,7 @@ def setup_api():
     a = {}
     with open(os.environ["HOME"] + "/.twang") as twang:
         for line in twang:
-            x = line.split(': ')
+            x = line.split(": ")
             a[x[0]] = x[1].strip()
     auth = tweepy.OAuthHandler(a["consumerKey"], a["consumerSecret"])
     auth.set_access_token(a["token"], a["tokenSecret"])
