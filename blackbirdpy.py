@@ -32,75 +32,101 @@ import json
 import re
 import sys
 import os
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import pytz
 import tweepy
 
-myTZ = pytz.timezone('US/Central')
+myTZ = pytz.timezone("US/Central")
 
-TWEET_EMBED_HTML = u'''<div class="bbpBox" id="t{id}">\n<blockquote>\n<span class="twContent">{tweetText}</span><span class="twMeta"><br /><span class="twDecoration">&mdash; </span><span class="twRealName">{realName}</span><span class="twDecoration"> (</span><a href="http://twitter.com/{screenName}"><span class="twScreenName">@{screenName}</span></a><span class="twDecoration">) </span><a href="{tweetURL}"><span class="twTimeStamp">{timeStamp}</span></a><span class="twDecoration"></span></span>\n</blockquote>\n</div>
-'''
+TWEET_EMBED_HTML = """<div class="bbpBox" id="t{id}">\n<blockquote>\n<span class="twContent">{tweetText}</span><span class="twMeta"><br /><span class="twDecoration">&mdash; </span><span class="twRealName">{realName}</span><span class="twDecoration"> (</span><a href="http://twitter.com/{screenName}"><span class="twScreenName">@{screenName}</span></a><span class="twDecoration">) </span><a href="{tweetURL}"><span class="twTimeStamp">{timeStamp}</span></a><span class="twDecoration"></span></span>\n</blockquote>\n</div>"""
 
 # This function pretty much taken directly from a tweepy example.
 def setup_api():
-  """Authorize the use of the Twitter API."""
-  a = {}
-  with open(os.environ['HOME'] + '/.twang') as twang:
-    for line in twang:
-      k, v = line.split(': ')
-      a[k] = v.strip()
-  auth = tweepy.OAuthHandler(a['consumerKey'], a['consumerSecret'])
-  auth.set_access_token(a['token'], a['tokenSecret'])
-  return tweepy.API(auth)
+    """Authorize the use of the Twitter API."""
+    a = {}
+    with open(os.environ["HOME"] + "/.twang") as twang:
+        for line in twang:
+            x = line.split(': ')
+            a[x[0]] = x[1].strip()
+    auth = tweepy.OAuthHandler(a["consumerKey"], a["consumerSecret"])
+    auth.set_access_token(a["token"], a["tokenSecret"])
+    return tweepy.API(auth)
+
 
 def wrap_entities(t):
-  """Turn URLs and @ mentions into links. Embed Twitter native photos."""
-  text = t.text
-  mentions = t.entities['user_mentions']
-  hashtags = t.entities['hashtags']
-  urls = t.entities['urls']
-  # media = json['entities']['media']
-  try:
-    media = t.extended_entities['media']
-  except (KeyError, AttributeError):
-    media = []
-  
-  for u in urls:
+    """Turn URLs and @ mentions into links. Embed Twitter native photos."""
+    text = t.text
+    mentions = t.entities["user_mentions"]
+    hashtags = t.entities["hashtags"]
+    urls = t.entities["urls"]
+    # media = json['entities']['media']
     try:
-      link = '<a href="' + u['expanded_url'] + '">' + u['display_url'] + '</a>'
-    except (KeyError, TypeError):
-      link = '<a href="' + u['url'] + '">' + u['url'] + '</a>'
-    text = text.replace(u['url'], link)
-  
-  for m in mentions:
-    text = re.sub('(?i)@' + m['screen_name'], '<a href="http://twitter.com/' +
-            m['screen_name'] + '">@' + m['screen_name'] + '</a>', text, 0)
+        media = t.extended_entities["media"]
+    except (KeyError, AttributeError):
+        media = []
 
-  for h in hashtags:
-    text = re.sub('(?i)#' + h['text'], '<a href="http://twitter.com/search/%23' +
-            h['text'] + '">#' + h['text'] + '</a>', text, 0)
-  
-  # For some reason, multiple photos have only one URL in the text of the tweet.
-  if len(media) > 0:
-    photolink = ''
-    for m in media:
-      if m['type'] == 'photo':
-        photolink += '<br /><br /><a href="' + m['media_url'] + ':large">' +\
-                    '<img src="' + m['media_url'] + ':small"></a>'
-      else:
-        photolink += '<a href="' + m['expanded_url'] + '">' +\
-                    m['display_url'] + '</a>'
-    text = text.replace(m['url'], photolink)
+    for u in urls:
+        try:
+            link = '<a href="' + u["expanded_url"] + '">' + u["display_url"] + "</a>"
+        except (KeyError, TypeError):
+            link = '<a href="' + u["url"] + '">' + u["url"] + "</a>"
+        text = text.replace(u["url"], link)
 
-  return text
-    
+    for m in mentions:
+        text = re.sub(
+            "(?i)@" + m["screen_name"],
+            '<a href="http://twitter.com/'
+            + m["screen_name"]
+            + '">@'
+            + m["screen_name"]
+            + "</a>",
+            text,
+            0,
+        )
+
+    for h in hashtags:
+        text = re.sub(
+            "(?i)#" + h["text"],
+            '<a href="http://twitter.com/search/%23'
+            + h["text"]
+            + '">#'
+            + h["text"]
+            + "</a>",
+            text,
+            0,
+        )
+
+    # For some reason, multiple photos have only one URL in the text of the tweet.
+    if len(media) > 0:
+        photolink = ""
+        for m in media:
+            if m["type"] == "photo":
+                photolink += (
+                    '<br /><br /><a href="'
+                    + m["media_url"]
+                    + ':large">'
+                    + '<img src="'
+                    + m["media_url"]
+                    + ':small"></a>'
+                )
+            else:
+                photolink += (
+                    '<a href="' + m["expanded_url"] + '">' + m["display_url"] + "</a>"
+                )
+        text = text.replace(m["url"], photolink)
+
+    return text
+
+
 def tweet_id_from_tweet_url(tweet_url):
     """Extract and return the numeric tweet ID from a full tweet URL."""
-    match = re.match(r'^https?://twitter\.com/(?:#!\/)?\w+/status(?:es)?/(\d+)$', tweet_url)
+    match = re.match(
+        r"^https?://twitter\.com/(?:#!\/)?\w+/status(?:es)?/(\d+)$", tweet_url
+    )
     try:
         return match.group(1)
     except AttributeError:
-        raise ValueError('Invalid tweet URL: {0}'.format(tweet_url))
+        raise ValueError("Invalid tweet URL: {0}".format(tweet_url))
 
 
 def embed_tweet_html(tweet_url, extra_css=None):
@@ -118,7 +144,7 @@ def embed_tweet_html(tweet_url, extra_css=None):
     tweet_id = tweet_id_from_tweet_url(tweet_url)
     api = setup_api()
     tweet = api.get_status(tweet_id)
-    tweet_text = wrap_entities(tweet).replace('\n', '<br />')
+    tweet_text = wrap_entities(tweet).replace("\n", "<br />")
 
     tweet_created_datetime = pytz.utc.localize(tweet.created_at).astimezone(myTZ)
     tweet_timestamp = tweet_created_datetime.strftime("%b %-d %Y %-I:%M %p")
@@ -140,11 +166,10 @@ def embed_tweet_html(tweet_url, extra_css=None):
         profileLinkColor=tweet.user.profile_link_color,
         timeStamp=tweet_timestamp,
         utcOffset=tweet.user.utc_offset,
-        bbpBoxCss=extra_css.get('bbpBox', ''),
+        bbpBoxCss=extra_css.get("bbpBox", ""),
     )
     return html
 
 
-
-if __name__ == '__main__':
-    print embed_tweet_html(sys.argv[1]).encode('utf8')
+if __name__ == "__main__":
+    print((embed_tweet_html(sys.argv[1])))
